@@ -219,6 +219,64 @@ void test_const_correctness(TestFramework& tf) {
     tf.assert_true(!str.empty(), "String representation should not be empty");
 }
 
+void test_mathematical_operations(TestFramework& tf) {
+    // --- Test addition ---
+    tf.start_test("Addition Forward");
+    auto a = make_value(2.0, "a");
+    auto b = make_value(3.0, "b");
+    auto c = a + b;
+    tf.assert_equal(5.0, c->data());
+
+    tf.start_test("Addition Backward");
+    c->backward();
+    tf.assert_equal(1.0, a->grad());
+    tf.assert_equal(1.0, b->grad());
+
+    // --- Test subtraction ---
+    tf.start_test("Subtraction Forward");
+    auto d = make_value(10.0, "d");
+    auto e = make_value(4.0, "e");
+    auto f = d - e;
+    tf.assert_equal(6.0, f->data());
+
+    tf.start_test("Subtraction Backward");
+    f->backward();
+    tf.assert_equal(1.0, d->grad());
+    tf.assert_equal(-1.0, e->grad());
+
+    // --- Test division ---
+    tf.start_test("Division Forward");
+    auto g = make_value(8.0, "g");
+    auto h = make_value(2.0, "h");
+    auto i = g / h;
+    tf.assert_equal(4.0, i->data());
+
+    tf.start_test("Division Backward");
+    i->backward();
+    tf.assert_equal(0.5, g->grad()); // 1/h
+    tf.assert_equal(-2.0, h->grad()); // -g / h^2
+
+    // --- Test mixed type operations ---
+    tf.start_test("Mixed Type (value + double) Forward");
+    auto j = make_value(5.0, "j");
+    auto k = j + 10.0;
+    tf.assert_equal(15.0, k->data());
+
+    tf.start_test("Mixed Type (value + double) Backward");
+    k->backward();
+    tf.assert_equal(1.0, j->grad());
+
+    tf.start_test("Mixed Type (double * value) Forward");
+    auto m = make_value(3.0, "m");
+    auto n = 4.0 * m;
+    tf.assert_equal(12.0, n->data());
+
+    tf.start_test("Mixed Type (double * value) Backward");
+    n->backward();
+    tf.assert_equal(4.0, m->grad());
+}
+
+
 // =============================================================================
 // MAIN TEST RUNNER
 // =============================================================================
@@ -253,6 +311,9 @@ int main() {
 
     std::cout << "\n--- Const Correctness Tests ---" << std::endl;
     test_const_correctness(tf);
+
+    std::cout << "\n--- Mathematical Operation & Backprop Tests ---" << std::endl;
+    test_mathematical_operations(tf);
 
     return 0;
 }

@@ -11,8 +11,11 @@
 #ifndef MICROGRAD_VALUE_HPP
 #define MICROGRAD_VALUE_HPP
 
+#include <functional> // For std::function
 #include <memory>
+#include <set> // For storing previous nodes
 #include <string>
+#include <vector>
 
 /**
  * Forward declaration of Value class
@@ -37,31 +40,34 @@ using ValuePtr = std::shared_ptr<Value>;
  * It stores:
  * - data: The actual numerical value
  * - grad: Accumulated gradient (∂Loss/∂this_value)
+ * - _backward: A function to compute the local gradient and propagate it
+ * - _prev: A set of parent nodes in the graph
+ * - _op: The operation that created this node
  * - label: Optional human-readable identifier
  *
- * Example usage:
- * @code
- * auto x = make_value(2.0, "input");
- * auto y = make_value(3.0, "weight");
- * // Future: auto z = x * y;  // Will create computational graph
- * @endcode
  */
-class Value {
-private:
-    double m_data;          ///< The actual numerical value
-    double m_grad;          ///< Accumulated gradient ∂Loss/∂this_value
-    std::string m_label;    ///< Optional label for debugging
+class Value : public std::enable_shared_from_this<Value> {
+  private:
+    double m_data;       ///< The actual numerical value
+    double m_grad;       ///< Accumulated gradient ∂Loss/∂this_value
+    std::string m_label; ///< Optional label for debugging
 
-public:
+    // --- Graph-related members ---
+    std::string m_op; ///< Operation that produced this value (e.g., "+", "*")
+    std::set<ValuePtr> m_prev; ///< Set of parent nodes
+    std::function<void()> m_backward_fn; ///< Function to run for backpropagation
+
+  public:
     /**
      * @brief Construct a Value with data and optional label
      * @param data The numerical value to store
+     * @param children The parent nodes of this value
+     * @param op The operation that created this value
      * @param label Optional human-readable identifier
-     *
-     * The explicit keyword prevents implicit conversions to catch potential bugs where doubles might be accidentally
-     * converted to Value objects.
      */
-    explicit Value(double data, const std::string& label = "");
+    explicit Value(double data, const std::string &label = "");
+    Value(double data, const std::set<ValuePtr> &children,
+          const std::string &op = "", const std::string &label = "");
 
     ~Value() = default;
 
@@ -104,6 +110,9 @@ public:
      * @return The gradient value ∂Loss/∂this_value
      */
     double grad() const;
+    const std::string &label() const;
+    const std::set<ValuePtr>& prev() const;
+    const std::string& op() const;
 
     /**
      * @brief Get the label
@@ -146,13 +155,16 @@ public:
      */
     void set_label(const std::string& label);
 
-    // ======= UTILITY METHODS ========
-
+    // ======== BACKPROPAGATION ========
     /**
-     * @brief Print the Value to stdout
+     * @brief Perform backpropagation from this Value
      *
-     * Useful for debugging and development.
+     * Computes the gradient of all preceding nodes in the graph.
+     * Assumes this Value is the final output of the graph (e.g. the loss).
      */
+    void backward();
+
+    // ======== UTILITY METHODS ========
     void print() const;
 
     /**
@@ -160,17 +172,33 @@ public:
      * @return String representation
      */
     std::string to_string() const;
+
+    // ======== ACTIVATION FUNCTIONS ========
+    friend ValuePtr tanh(const ValuePtr &v);
+    friend ValuePtr exp(const ValuePtr &v);
+    friend ValuePtr pow(const ValuePtr &base, double exp);
+    friend ValuePtr operator+(const ValuePtr &lhs, const ValuePtr &rhs);
+    friend ValuePtr operator*(const ValuePtr &lhs, const ValuePtr &rhs);
 };
 
 // ======== FACTORY FUNCTIONS =========
+ValuePtr make_value(double data, const std::string &label = "");
+ValuePtr make_value(double data, const std::set<ValuePtr> &children,
+                    const std::string &op = "", const std::string &label = "");
 
-/**
- * @brief Create a Value wrapped in shared_ptr
- * @param data The numerical value
- * @param label Optional label
- * @return shared_ptr to the created Value
- *
- */
-ValuePtr make_value(double data, const std::string& label = "");
+// ======== OPERATOR OVERLOADS ========
+ValuePtr operator-(const ValuePtr &lhs, const ValuePtr &rhs);
+ValuePtr operator/(const ValuePtr &lhs, const ValuePtr &rhs);
+ValuePtr operator-(const ValuePtr &v); // Negation
+
+// Overloads for operations with doubles
+ValuePtr operator+(const ValuePtr &lhs, double rhs);
+ValuePtr operator+(double lhs, const ValuePtr &rhs);
+ValuePtr operator*(const ValuePtr &lhs, double rhs);
+ValuePtr operator*(double lhs, const ValuePtr &rhs);
+ValuePtr operator-(const ValuePtr &lhs, double rhs);
+ValuePtr operator-(double lhs, const ValuePtr &rhs);
+ValuePtr operator/(const ValuePtr &lhs, double rhs);
+
 
 #endif // MICROGRAD_VALUE_HPP

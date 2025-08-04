@@ -110,7 +110,6 @@ class Value : public std::enable_shared_from_this<Value> {
      * @return The gradient value ∂Loss/∂this_value
      */
     double grad() const;
-    const std::string &label() const;
     const std::set<ValuePtr>& prev() const;
     const std::string& op() const;
 

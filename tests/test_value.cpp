@@ -276,6 +276,43 @@ void test_mathematical_operations(TestFramework& tf) {
     tf.assert_equal(4.0, m->grad());
 }
 
+void test_neuron_backprop(TestFramework& tf) {
+    tf.start_test("Neuron Backprop");
+
+    // Inputs
+    auto x1 = make_value(2.0, "x1");
+    auto x2 = make_value(0.0, "x2");
+    // Weights
+    auto w1 = make_value(-3.0, "w1");
+    auto w2 = make_value(1.0, "w2");
+    // Bias of the neuron
+    auto b = make_value(6.8813735870195432, "b");
+
+    // The forward pass of a single neuron
+    auto x1w1 = x1 * w1; x1w1->set_label("x1w1");
+    auto x2w2 = x2 * w2; x2w2->set_label("x2w2");
+    auto x1w1_x2w2 = x1w1 + x2w2; x1w1_x2w2->set_label("x1w1_x2w2");
+    auto n = x1w1_x2w2 + b; n->set_label("n");
+    auto o = tanh(n); o->set_label("o");
+
+    // --- Forward Pass Check ---
+    tf.assert_equal(0.70710678118, o->data(), 1e-9);
+
+    // --- Backward Pass ---
+    o->backward();
+
+    // --- Gradient Checks (manually derived values) ---
+    tf.assert_equal(1.0, o->grad());
+    tf.assert_equal(0.5, n->grad(), 1e-9);
+    tf.assert_equal(0.5, x1w1_x2w2->grad(), 1e-9);
+    tf.assert_equal(0.5, b->grad(), 1e-9);
+    tf.assert_equal(0.5, x1w1->grad(), 1e-9);
+    tf.assert_equal(0.5, x2w2->grad(), 1e-9);
+    tf.assert_equal(-1.5, x1->grad(), 1e-9); // grad(x1w1) * w1->data()
+    tf.assert_equal(1.0, w1->grad(), 1e-9);  // grad(x1w1) * x1->data()
+    tf.assert_equal(0.5, x2->grad(), 1e-9);  // grad(x2w2) * w2->data()
+    tf.assert_equal(0.0, w2->grad(), 1e-9);  // grad(x2w2) * x2->data()
+}
 
 // =============================================================================
 // MAIN TEST RUNNER
@@ -314,6 +351,9 @@ int main() {
 
     std::cout << "\n--- Mathematical Operation & Backprop Tests ---" << std::endl;
     test_mathematical_operations(tf);
+
+    std::cout << "\n--- Full Neuron Backprop Test ---" << std::endl;
+    test_neuron_backprop(tf);
 
     return 0;
 }
